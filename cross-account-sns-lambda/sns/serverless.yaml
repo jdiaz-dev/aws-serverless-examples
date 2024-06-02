@@ -1,0 +1,39 @@
+
+service: MySnsDeployment
+
+frameworkVersion: '3'
+
+provider: 
+  name: aws
+
+custom:
+  yourAccountIdA: 9870000
+  yourAccountIdB: 1230000 
+
+resources:
+  Resources:
+    MySnsTopic1: 
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: 'example-sns-topic-xx'
+        TopicName: 'example-sns-topic-xx'
+    TopicPolicy1:
+      Type: 'AWS::SNS::TopicPolicy'
+      Properties:
+        Topics:
+          - !Ref MySnsTopic1  
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action: 'sns:Publish'
+            Sid : '1'
+            Effect: Allow
+            Resource: "arn:aws:sns:us-east-1:${self:custom.yourAccountIdB}:example-sns-topic-xx" 
+            Principal:
+              AWS: !Sub arn:aws:iam::${self:custom.yourAccountIdA}:root
+          - Action: 'sns:Subscribe'
+            Sid: '2'
+            Effect: Allow
+            Resource: "arn:aws:sns:us-east-1:${self:custom.yourAccountIdB}:example-sns-topic-xx" 
+            Principal:
+              AWS: arn:aws:iam::${self:custom.yourAccountIdA}:root

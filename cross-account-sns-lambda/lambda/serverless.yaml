@@ -1,0 +1,82 @@
+
+service: lambdaDeployment
+frameworkVersion: '3'
+
+provider: 
+  name: aws
+  runtime: nodejs18.x
+
+custom:
+  yourAccountId: 1230000
+  yourBucketS3Key: yourS3/yourZipedLambda.zip
+
+resources:
+  Resources:
+    MyLambdaLogGroup: 
+      Type: "AWS::Logs::LogGroup"
+      Properties: 
+        LogGroupName: "/aws/lambda/lambda-log-group"
+        RetentionInDays: 30
+        Tags: 
+          - Key: "owner"
+            Value: "I"
+
+    LambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                AWS: arn:aws:iam::${self:custom.yourAccountId}:root
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: "lambda-logs"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action: 
+                    - "logs:CreateLogStream"
+                    - "logs:DescribeLogStreams"
+                    - "logs:PutRetentionPolicy"
+                    - "logs:CreateLogGroup"
+                    - "logs:PutLogEvents"
+                    - "cloudwatch:*"
+                  Resource: !GetAtt MyLambdaLogGroup.Arn
+                
+    MyLambda: 
+      Type: AWS::Lambda::Function
+      Properties:
+        FunctionName: "myLambda"
+        Code: 
+          S3Bucket: 
+            !Ref ServerlessDeploymentBucket
+          S3Key: ${self:custom.yourBucketS3Key}
+        Handler: ./src/receiveEvent.receiveEvent
+        Runtime: 'nodejs18.x'
+        MemorySize: 1024
+        Timeout: 6
+        Role: !GetAtt LambdaRole.Arn
+        LoggingConfig:
+          LogGroup: /aws/lambda/lambda-log-group
+      DependsOn:
+        - MyLambdaLogGroup
+    LambdaPermission:
+      Type: 'AWS::Lambda::Permission'
+      Properties: 
+        FunctionName: !Ref MyLambda
+        Action: 'lambda:InvokeFunction'
+        Principal: 'sns.amazonaws.com'
+        SourceArn: "arn:aws:sns:us-east-1:${self:custom.yourAccountId}:*"
+    SnsSubscription:
+      Type: 'AWS::SNS::Subscription'
+      Properties: 
+        Endpoint: !GetAtt MyLambda.Arn
+        Protocol: 'lambda'
+        TopicArn: arn:aws:sns:us-east-1:${self:custom.yourAccountId}:example-sns-topic-xx
+        
